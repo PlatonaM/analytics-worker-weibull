@@ -35,7 +35,12 @@ jobs_handler = handlers.Jobs(
     check_delay=conf.Jobs.check,
     max_jobs=conf.Jobs.max_num
 )
-skd_handler = handlers.Scheduler(job_handler=jobs_handler, db_handler=db_handler, delay=conf.Jobs.skd_delay)
+skd_handler = handlers.Scheduler(
+    job_handler=jobs_handler,
+    db_handler=db_handler,
+    data_handler=data_handler,
+    delay=conf.Jobs.skd_delay
+)
 
 app = falcon.API()
 
