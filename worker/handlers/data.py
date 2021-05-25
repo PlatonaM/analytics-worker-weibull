@@ -93,7 +93,7 @@ class Data(threading.Thread):
     def __refresh_cache_item(self, source_id: str, cache_item: CacheItem):
         cache_item.file, cache_item.checksum, cache_item.time_field = self.__get_new(source_id=source_id)
 
-    def get(self, source_id: str) -> typing.Tuple[str, str]:
+    def get(self, source_id: str) -> typing.Tuple[str, str, str]:
         with self.__lock:
             if source_id not in self.__cache:
                 self.__cache[source_id] = CacheItem()
@@ -112,7 +112,7 @@ class Data(threading.Thread):
                     except Exception as ex:
                         logger.warning("could not remove stale data - {}".format(ex))
                 cache_item.created = time.time()
-            return os.path.join(self.__st_path, cache_item.file), cache_item.time_field
+            return os.path.join(self.__st_path, cache_item.file), cache_item.time_field, cache_item.checksum
 
     def run(self) -> None:
         stale_items = list()
