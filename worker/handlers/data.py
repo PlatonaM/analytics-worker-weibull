@@ -52,7 +52,7 @@ class Data(threading.Thread):
         self.__cache: typing.Dict[str, CacheItem] = dict()
         self.__lock = threading.Lock()
 
-    def __get_metadata(self, source_id: str) -> models.MetaData:
+    def get_metadata(self, source_id: str) -> models.MetaData:
         resp = requests.get(url="{}/{}".format(self.__data_api_url, urllib.parse.quote(source_id)))
         if not resp.ok:
             raise RuntimeError(resp.status_code)
@@ -79,14 +79,14 @@ class Data(threading.Thread):
         return file_name, checksum.hexdigest()
 
     def __get(self, source_id: str):
-        metadata = self.__get_metadata(source_id)
+        metadata = self.get_metadata(source_id)
         file_name, checksum = self.__get_data(source_id, metadata.compressed)
         count = 0
         while metadata.checksum != checksum:
             if count > 3:
                 raise RuntimeError("checksum mismatch for '{}' - data might have changed")
             logger.warning("checksum mismatch for '{}' - refreshing metadata".format(source_id))
-            metadata = self.__get_metadata(source_id)
+            metadata = self.get_metadata(source_id)
             count = count + 1
         return file_name, metadata.checksum, metadata.time_field
 
@@ -103,7 +103,7 @@ class Data(threading.Thread):
                 self.__refresh_cache_item(source_id, cache_item)
                 cache_item.created = time.time()
             elif time.time() - cache_item.created > self.__max_age:
-                metadata = self.__get_metadata(source_id)
+                metadata = self.get_metadata(source_id)
                 if metadata.checksum != cache_item.checksum:
                     old_file = cache_item.file
                     self.__refresh_cache_item(source_id, cache_item)
