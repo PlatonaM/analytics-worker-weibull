@@ -64,6 +64,8 @@ class WeibullCollection:
                 self.__db_handler.put(b"weibull-", weibull.id.encode(), json.dumps(dict(weibull)).encode())
                 self.__jobs_handler.create(model_id=weibull.id)
                 resp.status = falcon.HTTP_201
+            resp.content_type = falcon.MEDIA_TEXT
+            resp.body = w_id
         except Exception as ex:
             resp.status = falcon.HTTP_500
             reqErrorLog(req, ex)
