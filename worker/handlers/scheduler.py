@@ -40,7 +40,7 @@ class Scheduler(threading.Thread):
                 logger.debug("scheduling jobs ...")
                 for model_id in self.__db_handler.list_keys(b"models-"):
                     try:
-                        self.__job_handler.create(model_id=model_id)
+                        self.__job_handler.create(weibull_id=model_id)
                     except Exception as ex:
                         logger.error("scheduling job for model '{}' failed - {}".format(model_id, ex))
             except Exception as ex:

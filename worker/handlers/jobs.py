@@ -87,18 +87,18 @@ class Jobs(threading.Thread):
         self.__job_pool: typing.Dict[str, models.Job] = dict()
         self.__worker_pool: typing.Dict[str, Worker] = dict()
 
-    def create(self, model_id: str) -> str:
+    def create(self, weibull_id: str) -> str:
         for job in self.__job_pool.values():
-            if job.model_id == model_id:
-                logger.debug("job for model '{}' already exists".format(model_id))
+            if job.model_id == weibull_id:
+                logger.debug("job for model '{}' already exists".format(weibull_id))
                 return job.id
         job = models.Job(
             id=uuid.uuid4().hex,
-            model_id=model_id,
+            model_id=weibull_id,
             created="{}Z".format(datetime.datetime.utcnow().isoformat())
         )
         self.__job_pool[job.id] = job
-        logger.debug("created job for model '{}'".format(model_id))
+        logger.debug("created job for model '{}'".format(weibull_id))
         self.__job_queue.put_nowait(job.id)
         return job.id
 
