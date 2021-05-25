@@ -78,7 +78,7 @@ class Data(threading.Thread):
                     checksum.update(buffer)
         return file_name, checksum.hexdigest()
 
-    def __get(self, source_id: str):
+    def __get_new(self, source_id: str):
         metadata = self.get_metadata(source_id)
         file_name, checksum = self.__get_data(source_id, metadata.compressed)
         count = 0
@@ -91,7 +91,7 @@ class Data(threading.Thread):
         return file_name, metadata.checksum, metadata.time_field
 
     def __refresh_cache_item(self, source_id: str, cache_item: CacheItem):
-        cache_item.file, cache_item.checksum, cache_item.time_field = self.__get(source_id=source_id)
+        cache_item.file, cache_item.checksum, cache_item.time_field = self.__get_new(source_id=source_id)
 
     def get(self, source_id: str) -> typing.Tuple[str, str]:
         with self.__lock:
