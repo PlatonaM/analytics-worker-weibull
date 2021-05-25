@@ -48,7 +48,7 @@ class Worker(threading.Thread):
             logger.debug("starting job '{}' ...".format(self.__job.id))
             self.__job.status = models.JobStatus.running
             _weibull = models.Weibull(json.loads(self.__db_handler.get(b"weibull-", self.__job.model_id.encode())))
-            file_path, time_field = self.__data_handler.get(source_id=_weibull.service_id)
+            file_path, time_field, _weibull.data_checksum = self.__data_handler.get(source_id=_weibull.service_id)
             logger.debug(
                 "{}: calculating weibull distribution for '{}' in '{}' ...".format(
                     self.__job.id, _weibull.config["target_error_code"],
