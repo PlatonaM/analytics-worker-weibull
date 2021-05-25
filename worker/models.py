@@ -43,7 +43,7 @@ class Weibull:
     id = None
     created = None
     config = None
-    data = None
+    result = None
     service_id = None
 
 

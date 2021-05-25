@@ -55,7 +55,7 @@ class Worker(threading.Thread):
                     _weibull.config["target_col"]
                 )
             )
-            _weibull.data = weibull.generate_weibull(
+            _weibull.result = weibull.generate_weibull(
                 df=weibull.df_from_csv(
                     csv_path=file_path,
                     time_col=time_field,
