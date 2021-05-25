@@ -45,6 +45,7 @@ class Weibull:
     config = None
     result = None
     service_id = None
+    data_checksum = None
 
 
 @simple_struct.structure
