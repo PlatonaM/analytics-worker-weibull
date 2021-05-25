@@ -41,7 +41,7 @@ class Conf:
     class Jobs:
         max_num = 5
         check = 5
-        skd_delay = 43200
+        skd_delay = 600
 
 
 conf = Conf(load=False)
