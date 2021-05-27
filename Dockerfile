@@ -1,4 +1,4 @@
-FROM  fgseitsrancher.wifa.intern.uni-leipzig.de:5000/data-science-base:latest
+FROM  platonam/data-science-base:latest
 
 RUN apt-get update && apt-get install -y git
 
