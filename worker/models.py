@@ -34,7 +34,7 @@ class Job:
     id = None
     created = None
     status = JobStatus.pending
-    model_id = None
+    weibull_id = None
     reason = None
 
 

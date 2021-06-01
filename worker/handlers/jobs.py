@@ -47,7 +47,7 @@ class Worker(threading.Thread):
         try:
             logger.debug("starting job '{}' ...".format(self.__job.id))
             self.__job.status = models.JobStatus.running
-            _weibull = models.Weibull(json.loads(self.__db_handler.get(b"weibull-", self.__job.model_id.encode())))
+            _weibull = models.Weibull(json.loads(self.__db_handler.get(b"weibull-", self.__job.weibull_id.encode())))
             file_path, time_field, _weibull.data_checksum = self.__data_handler.get(source_id=_weibull.service_id)
             logger.debug(
                 "{}: calculating weibull distribution for '{}' in '{}' ...".format(
@@ -89,12 +89,12 @@ class Jobs(threading.Thread):
 
     def create(self, weibull_id: str) -> str:
         for job in self.__job_pool.values():
-            if job.model_id == weibull_id:
+            if job.weibull_id == weibull_id:
                 logger.debug("job for model '{}' already exists".format(weibull_id))
                 return job.id
         job = models.Job(
             id=uuid.uuid4().hex,
-            model_id=weibull_id,
+            weibull_id=weibull_id,
             created="{}Z".format(datetime.datetime.utcnow().isoformat())
         )
         self.__job_pool[job.id] = job
