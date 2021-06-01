@@ -107,6 +107,9 @@ _Send a weibull request to create a new weibull resource._
     -H 'Content-Type: application/json' \
     -X POST http://<host>/weibull
 
+    # Response status 201 if created and 200 if resource alread exists
+    # ID of weibull resource as response body (text/plain)
+
 #### /weibull/{weibull_id}
 
 **GET**
