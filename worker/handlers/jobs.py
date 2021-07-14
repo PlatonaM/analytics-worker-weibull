@@ -90,7 +90,7 @@ class Jobs(threading.Thread):
     def create(self, weibull_id: str) -> str:
         for job in self.__job_pool.values():
             if job.weibull_id == weibull_id:
-                logger.debug("job for model '{}' already exists".format(weibull_id))
+                logger.debug("job for weibull ID '{}' already exists".format(weibull_id))
                 return job.id
         job = models.Job(
             id=uuid.uuid4().hex,
@@ -98,7 +98,7 @@ class Jobs(threading.Thread):
             created="{}Z".format(datetime.datetime.utcnow().isoformat())
         )
         self.__job_pool[job.id] = job
-        logger.debug("created job for model '{}'".format(weibull_id))
+        logger.debug("created job for weibull ID '{}'".format(weibull_id))
         self.__job_queue.put_nowait(job.id)
         return job.id
 
