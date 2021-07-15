@@ -110,22 +110,25 @@ class Jobs(threading.Thread):
 
     def run(self):
         while True:
-            if len(self.__worker_pool) < self.__max_jobs:
-                try:
-                    job_id = self.__job_queue.get(timeout=self.__check_delay)
-                    worker = Worker(
-                        job=self.__job_pool[job_id],
-                        db_handler=self.__db_handler,
-                        data_handler=self.__data_handler
-                    )
-                    self.__worker_pool[job_id] = worker
-                    worker.start()
-                except queue.Empty:
-                    pass
-            else:
-                time.sleep(self.__check_delay)
-            for job_id in list(self.__worker_pool.keys()):
-                if self.__worker_pool[job_id].done:
-                    del self.__worker_pool[job_id]
-                    del self.__job_pool[job_id]
-                    # self.__db_handler.delete(b"jobs-", job_id.encode())
+            try:
+                if len(self.__worker_pool) < self.__max_jobs:
+                    try:
+                        job_id = self.__job_queue.get(timeout=self.__check_delay)
+                        worker = Worker(
+                            job=self.__job_pool[job_id],
+                            db_handler=self.__db_handler,
+                            data_handler=self.__data_handler
+                        )
+                        self.__worker_pool[job_id] = worker
+                        worker.start()
+                    except queue.Empty:
+                        pass
+                else:
+                    time.sleep(self.__check_delay)
+                for job_id in list(self.__worker_pool.keys()):
+                    if self.__worker_pool[job_id].done:
+                        del self.__worker_pool[job_id]
+                        del self.__job_pool[job_id]
+                        # self.__db_handler.delete(b"jobs-", job_id.encode())
+            except Exception as ex:
+                logger.error("job handling failed - {}".format(ex))
