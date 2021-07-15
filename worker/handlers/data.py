@@ -117,17 +117,20 @@ class Data(threading.Thread):
     def run(self) -> None:
         stale_items = list()
         while True:
-            time.sleep(self.__max_age / 2)
-            with self.__lock:
-                for key, item in self.__cache.items():
-                    if time.time() - item.created > self.__max_age and not item.lock.locked():
-                        stale_items.append(key)
-                for key in stale_items:
-                    try:
-                        os.remove(os.path.join(self.__st_path, self.__cache[key].file))
-                    except Exception as ex:
-                        logger.warning("could not remove stale data - {}".format(ex))
-                    del self.__cache[key]
+            try:
+                time.sleep(self.__max_age / 2)
+                with self.__lock:
+                    for key, item in self.__cache.items():
+                        if not item.lock.locked() and time.time() - item.created > self.__max_age:
+                            stale_items.append(key)
+                    for key in stale_items:
+                        try:
+                            os.remove(os.path.join(self.__st_path, self.__cache[key].file))
+                        except Exception as ex:
+                            logger.warning("could not remove stale data - {}".format(ex))
+                        del self.__cache[key]
+            except Exception as ex:
+                logger.error("cleaning stale data failed - {}".format(ex))
             stale_items.clear()
 
     def purge_cache(self):
