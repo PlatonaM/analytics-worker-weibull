@@ -26,8 +26,6 @@ import queue
 import typing
 import uuid
 import datetime
-import base64
-import gzip
 import json
 import time
 
