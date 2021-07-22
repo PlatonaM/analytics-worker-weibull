@@ -28,50 +28,68 @@ import uuid
 import datetime
 import json
 import time
+import multiprocessing
+import signal
+import sys
 
 
 logger = getLogger(__name__.split(".", 1)[-1])
 
 
-class Worker(threading.Thread):
-    def __init__(self, job: models.Job, db_handler: DB, data_handler: Data):
+def handle_sigterm(signo, stack_frame):
+    logger.debug("got signal '{}' - exiting ...".format(signo))
+    sys.exit(0)
+
+
+class Result:
+    def __init__(self):
+        self.weibull_item: typing.Optional[models.Weibull] = None
+        self.job: typing.Optional[models.Job] = None
+        self.error = False
+
+
+class Worker(multiprocessing.Process):
+    def __init__(self, job: models.Job, weibull_item: models.Weibull, data_handler: Data):
         super().__init__(name="jobs-worker-{}".format(job.id), daemon=True)
-        self.__db_handler = db_handler
+        self.__weibull_item = weibull_item
         self.__data_handler = data_handler
         self.__job = job
-        self.done = False
+        self.result = multiprocessing.Queue()
 
     def run(self) -> None:
+        signal.signal(signal.SIGTERM, handle_sigterm)
+        signal.signal(signal.SIGINT, handle_sigterm)
+        result_obj = Result()
         try:
             logger.debug("starting job '{}' ...".format(self.__job.id))
             self.__job.status = models.JobStatus.running
-            _weibull = models.Weibull(json.loads(self.__db_handler.get(b"weibull-", self.__job.weibull_id.encode())))
-            file_path, time_field, _weibull.data_checksum = self.__data_handler.get(source_id=_weibull.service_id)
+            file_path, time_field, self.__weibull_item.data_checksum = self.__data_handler.get(source_id=self.__weibull_item.service_id)
             logger.debug(
                 "{}: calculating weibull distribution for '{}' in '{}' ...".format(
-                    self.__job.id, _weibull.config["target_error_code"],
-                    _weibull.config["target_col"]
+                    self.__job.id, self.__weibull_item.config["target_error_code"],
+                    self.__weibull_item.config["target_col"]
                 )
             )
-            _weibull.result = weibull.generate_weibull(
+            self.__weibull_item.result = weibull.generate_weibull(
                 df=weibull.df_from_csv(
                     csv_path=file_path,
                     time_col=time_field,
                     sorted=True
                 ),
-                errorcode_column=_weibull.config["target_col"],
-                errorcode=_weibull.config["target_error_code"]
+                errorcode_column=self.__weibull_item.config["target_col"],
+                errorcode=self.__weibull_item.config["target_error_code"]
             )
-            _weibull.created = "{}Z".format(datetime.datetime.utcnow().isoformat())
-            self.__db_handler.put(b"weibull-", _weibull.id.encode(), json.dumps(dict(_weibull)).encode())
+            self.__weibull_item.created = "{}Z".format(datetime.datetime.utcnow().isoformat())
+            result_obj.weibull_item = self.__weibull_item
             self.__job.status = models.JobStatus.finished
             logger.debug("{}: completed successfully".format(self.__job.id))
         except Exception as ex:
             self.__job.status = models.JobStatus.failed
             self.__job.reason = str(ex)
             logger.error("{}: failed - {}".format(self.__job.id, ex))
-        self.__db_handler.put(b"jobs-", self.__job.id.encode(), json.dumps(dict(self.__job)).encode())
-        self.done = True
+            result_obj.error = True
+        result_obj.job = self.__job
+        self.result.put(result_obj)
 
 
 class Jobs(threading.Thread):
@@ -114,7 +132,7 @@ class Jobs(threading.Thread):
                         job_id = self.__job_queue.get(timeout=self.__check_delay)
                         worker = Worker(
                             job=self.__job_pool[job_id],
-                            db_handler=self.__db_handler,
+                            weibull_item=models.Weibull(json.loads(self.__db_handler.get(b"weibull-", self.__job_pool[job_id].weibull_id.encode()))),
                             data_handler=self.__data_handler
                         )
                         self.__worker_pool[job_id] = worker
@@ -124,7 +142,12 @@ class Jobs(threading.Thread):
                 else:
                     time.sleep(self.__check_delay)
                 for job_id in list(self.__worker_pool.keys()):
-                    if self.__worker_pool[job_id].done:
+                    if not self.__worker_pool[job_id].is_alive():
+                        res = self.__worker_pool[job_id].result.get()
+                        self.__db_handler.put(b"jobs-", res.job.id.encode(), json.dumps(dict(res.job)).encode())
+                        if not res.error:
+                            self.__db_handler.put(b"weibull-", res.weibull_item.id.encode(), json.dumps(dict(res.weibull_item)).encode())
+                        self.__worker_pool[job_id].close()
                         del self.__worker_pool[job_id]
                         del self.__job_pool[job_id]
                         # self.__db_handler.delete(b"jobs-", job_id.encode())
