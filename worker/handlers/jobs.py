@@ -41,6 +41,27 @@ def handle_sigterm(signo, stack_frame):
     sys.exit(0)
 
 
+class ConcatenatedFile:
+    def __init__(self, files):
+        self.__chunks = files
+
+    def __read(self, n=65536):
+        for chunk in self.__chunks:
+            file = open(chunk, "rb")
+            buffer = file.read(n)
+            while buffer:
+                yield buffer
+                buffer = file.read(n)
+            file.close()
+
+    def build_input(self):
+        path = "/data_cache/{}".format(uuid.uuid4().hex)
+        with open(path, "wb") as file:
+            for buffer in self.__read():
+                file.write(buffer)
+        return path
+
+
 class Result:
     def __init__(self):
         self.weibull_item: typing.Optional[models.Weibull] = None
@@ -63,7 +84,8 @@ class Worker(multiprocessing.Process):
         try:
             logger.debug("starting job '{}' ...".format(self.__job.id))
             self.__job.status = models.JobStatus.running
-            file_path, time_field, self.__weibull_item.data_checksum = self.__data_handler.get(source_id=self.__weibull_item.service_id)
+            files, time_field, self.__weibull_item.data_checksum = self.__data_handler.get(source_id=self.__weibull_item.service_id)
+            input_path = ConcatenatedFile(files=files).build_input()
             logger.debug(
                 "{}: calculating weibull distribution for '{}' in '{}' ...".format(
                     self.__job.id, self.__weibull_item.config["target_error_code"],
@@ -72,7 +94,7 @@ class Worker(multiprocessing.Process):
             )
             self.__weibull_item.result = weibull.generate_weibull(
                 df=weibull.df_from_csv(
-                    csv_path=file_path,
+                    csv_path=input_path,
                     time_col=time_field,
                     sorted=True
                 ),
