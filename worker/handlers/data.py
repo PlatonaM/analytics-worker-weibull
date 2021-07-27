@@ -36,7 +36,7 @@ class CacheItem:
     def __init__(self):
         self.file = None
         self.checksum = None
-        self.created = None
+        self.created = time.time()
         self.time_field = None
         self.lock = threading.Lock()
 
