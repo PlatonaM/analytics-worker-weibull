@@ -25,7 +25,6 @@ import time
 import typing
 import threading
 import urllib.parse
-import uuid
 import hashlib
 
 
@@ -34,7 +33,7 @@ logger = getLogger(__name__.split(".", 1)[-1])
 
 class CacheItem:
     def __init__(self):
-        self.file = None
+        self.files = None
         self.checksum = None
         self.created = time.time()
         self.time_field = None
@@ -61,13 +60,11 @@ class Data(threading.Thread):
             raise RuntimeError("no data available for '{}'".format(source_id))
         return metadata
 
-    def __get_data(self, source_id: str, compressed: bool):
-        with requests.get(url="{}/{}/file".format(self.__data_api_url, urllib.parse.quote(source_id)), stream=True) as resp:
+    def __get_chunk(self, source_id: str, file: str, checksum: hashlib.sha256, compressed: bool):
+        with requests.get(url="{}/{}/files/{}".format(self.__data_api_url, urllib.parse.quote(source_id), file), stream=True) as resp:
             if not resp.ok:
                 raise RuntimeError(resp.status_code)
-            file_name = uuid.uuid4().hex
-            checksum = hashlib.sha256()
-            with open(os.path.join(self.__st_path, file_name), "wb") as file:
+            with open(os.path.join(self.__st_path, file), "wb") as file:
                 if compressed:
                     file = util.Decompress(file)
                 buffer = resp.raw.read(self.__chunk_size)
@@ -76,43 +73,59 @@ class Data(threading.Thread):
                     file.write(buffer)
                     buffer = resp.raw.read(self.__chunk_size)
                     checksum.update(buffer)
-        return file_name, checksum.hexdigest()
+                file.flush()
+
+    def __get_data(self, source_id: str, files: list, compressed: bool):
+        checksum = hashlib.sha256()
+        retries = 0
+        chunk_count = 0
+        for file in files:
+            chunk_count += 1
+            logger.debug("retrieving chunk {}/{} for '{}' ...".format(chunk_count, len(files), source_id))
+            try:
+                self.__get_chunk(source_id=source_id, file=file, checksum=checksum, compressed=compressed)
+            except Exception as ex:
+                if retries >= 5:
+                    logger.error("retrieving chunk {}/{} for '{}' failed - {}".format(chunk_count, len(files), source_id, ex))
+                    raise ex
+                retries += 1
+        return checksum.hexdigest()
 
     def __get_new(self, source_id: str):
         metadata = self.get_metadata(source_id)
-        file_name, checksum = self.__get_data(source_id, metadata.compressed)
-        count = 0
+        checksum = self.__get_data(source_id, metadata.files, metadata.compressed)
+        retries = 0
         while metadata.checksum != checksum:
-            if count > 3:
+            if retries > 3:
                 raise RuntimeError("checksum mismatch for '{}' - data might have changed")
             logger.warning("checksum mismatch for '{}' - refreshing metadata".format(source_id))
             metadata = self.get_metadata(source_id)
-            count = count + 1
-        return file_name, metadata.checksum, metadata.time_field
+            retries += 1
+        return metadata.files, metadata.checksum, metadata.time_field
 
     def __refresh_cache_item(self, source_id: str, cache_item: CacheItem):
-        cache_item.file, cache_item.checksum, cache_item.time_field = self.__get_new(source_id=source_id)
+        cache_item.files, cache_item.checksum, cache_item.time_field = self.__get_new(source_id=source_id)
 
-    def get(self, source_id: str) -> typing.Tuple[str, str, str]:
+    def get(self, source_id: str) -> typing.Tuple[list, str, str]:
         with self.__lock:
             if source_id not in self.__cache:
                 self.__cache[source_id] = CacheItem()
         cache_item = self.__cache[source_id]
         with cache_item.lock:
-            if not cache_item.file:
+            if not cache_item.files:
                 self.__refresh_cache_item(source_id, cache_item)
-                cache_item.created = time.time()
             elif time.time() - cache_item.created > self.__max_age:
                 metadata = self.get_metadata(source_id)
                 if metadata.checksum != cache_item.checksum:
-                    old_file = cache_item.file
+                    old_files = cache_item.files
                     self.__refresh_cache_item(source_id, cache_item)
-                    try:
-                        os.remove(os.path.join(self.__st_path, old_file))
-                    except Exception as ex:
-                        logger.warning("could not remove stale data - {}".format(ex))
+                    for old_file in old_files:
+                        try:
+                            os.remove(os.path.join(self.__st_path, old_file))
+                        except Exception as ex:
+                            logger.warning("could not remove stale data - {}".format(ex))
                 cache_item.created = time.time()
-            return os.path.join(self.__st_path, cache_item.file), cache_item.time_field, cache_item.checksum
+            return [os.path.join(self.__st_path, file) for file in cache_item.files], cache_item.time_field, cache_item.checksum
 
     def run(self) -> None:
         stale_items = list()
@@ -124,10 +137,11 @@ class Data(threading.Thread):
                         if not item.lock.locked() and time.time() - item.created > self.__max_age:
                             stale_items.append(key)
                     for key in stale_items:
-                        try:
-                            os.remove(os.path.join(self.__st_path, self.__cache[key].file))
-                        except Exception as ex:
-                            logger.warning("could not remove stale data - {}".format(ex))
+                        for file in self.__cache[key].files:
+                            try:
+                                os.remove(os.path.join(self.__st_path, file))
+                            except Exception as ex:
+                                logger.warning("could not remove stale data - {}".format(ex))
                         del self.__cache[key]
             except Exception as ex:
                 logger.error("cleaning stale data failed - {}".format(ex))
