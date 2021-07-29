@@ -1,8 +1,8 @@
 ## analytics-worker-weibull
 
-Automated calculation of weibull distributions for given error codes.
+Automated calculation of shape and scale parameters for weibull distributions for given error codes.
 
-Weibull distributions and their corresponding error codes are stored as _weibull resources_.
+Shape and scale parameters and their corresponding error codes are stored as _weibull resources_.
 In order for calculations to be performed, a weibull resource must be created via a _weibull request_.
 A weibull request contains an error code, and the column in which the error code can occur.
 Calculations are performed by jobs. A job is started automatically when new data is available.
