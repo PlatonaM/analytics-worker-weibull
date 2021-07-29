@@ -41,6 +41,7 @@ def handle_sigterm(signo, stack_frame):
     sys.exit(0)
 
 
+# temporary workaround for code not supporting chunked data --->
 class ConcatenatedFile:
     def __init__(self, files):
         self.__chunks = files
@@ -60,6 +61,7 @@ class ConcatenatedFile:
             for buffer in self.__read():
                 file.write(buffer)
         return path
+# <-------------------------------------------------------------
 
 
 class Result:
@@ -172,6 +174,5 @@ class Jobs(threading.Thread):
                         self.__worker_pool[job_id].close()
                         del self.__worker_pool[job_id]
                         del self.__job_pool[job_id]
-                        # self.__db_handler.delete(b"jobs-", job_id.encode())
             except Exception as ex:
                 logger.error("job handling failed - {}".format(ex))
