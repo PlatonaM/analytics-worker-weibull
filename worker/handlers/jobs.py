@@ -167,10 +167,13 @@ class Jobs(threading.Thread):
                     time.sleep(self.__check_delay)
                 for job_id in list(self.__worker_pool.keys()):
                     if not self.__worker_pool[job_id].is_alive():
-                        res = self.__worker_pool[job_id].result.get()
-                        self.__db_handler.put(b"jobs-", res.job.id.encode(), json.dumps(dict(res.job)).encode())
-                        if not res.error:
-                            self.__db_handler.put(b"weibull-", res.weibull_item.id.encode(), json.dumps(dict(res.weibull_item)).encode())
+                        try:
+                            res = self.__worker_pool[job_id].result.get(timeout=5)
+                            self.__db_handler.put(b"jobs-", res.job.id.encode(), json.dumps(dict(res.job)).encode())
+                            if not res.error:
+                                self.__db_handler.put(b"weibull-", res.weibull_item.id.encode(), json.dumps(dict(res.weibull_item)).encode())
+                        except queue.Empty:
+                            logger.error("job '{}' quit with exitcode '{}'".format(job_id, self.__worker_pool[job_id].exitcode))
                         self.__worker_pool[job_id].close()
                         del self.__worker_pool[job_id]
                         del self.__job_pool[job_id]
