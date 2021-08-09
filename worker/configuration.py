@@ -42,6 +42,7 @@ class Conf:
         max_num = 5
         check = 5
         skd_delay = 600
+        skd_enabled = True
 
 
 conf = Conf(load=False)
