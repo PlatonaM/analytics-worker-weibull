@@ -26,6 +26,8 @@ Alternatively, jobs can also be triggered manually with a _job request_.
 
 `CONF_JOBS_SKD_DELAY`: Set the time between job scheduler runs.
 
+`CONF_JOBS_SKD_ENABLED`: Determine if job scheduler runs.
+
 ### Data Structures
 
 #### Job resource
